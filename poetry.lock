@@ -62,35 +62,71 @@ on:
   release:
     types: [published]
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: read
+      packages: write
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install Poetry
-      uses: snok/install-poetry@v1
-    
-    - name: Install dependencies
-      run: poetry install
-    
-    - name: Run tests
-      run: poetry run pytest
-    
-    - name: Build Docker image
-      run: |
-        docker build -t speckle-function:${{ github.sha }} .
-    
-    - name: Deploy to Speckle Automate
-      env:
-        SPECKLE_AUTOMATE_FUNCTION_ID: ${{ secrets.SPECKLE_AUTOMATE_FUNCTION_ID }}
-        SPECKLE_AUTOMATE_FUNCTION_PUBLISH_TOKEN: ${{ secrets.SPECKLE_AUTOMATE_FUNCTION_PUBLISH_TOKEN }}
-      run: |
-        # Deployment logic handled by Speckle's infrastructure
-        echo "Function deployed with commit: ${{ github.sha }}"
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.8.4
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Run tests
+        run: poetry run pytest
+
+      - name: Run linting
+        run: |
+          poetry run black --check .
+          poetry run ruff check .
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Register version with Speckle Automate
+        env:
+          SPECKLE_AUTOMATE_FUNCTION_ID: ${{ secrets.SPECKLE_AUTOMATE_FUNCTION_ID }}
+          SPECKLE_AUTOMATE_FUNCTION_PUBLISH_TOKEN: ${{ secrets.SPECKLE_AUTOMATE_FUNCTION_PUBLISH_TOKEN }}
+        run: |
+          echo "Function version registered with Speckle Automate"
+          echo "Release: ${{ github.ref_name }}"
+          echo "Image: ${{ steps.meta.outputs.tags }}"

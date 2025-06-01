@@ -1,8 +1,10 @@
 {
-  "speckleToken": "YOUR SPEKCLE TOKEN",
+  "speckleToken": "14f1caea68a8c618acb72a5a76134e87ac4f9cf60e",
   "functionInputs": {
-    "whisperMessage": "you are doing something weird",
-    "forbiddenSpeckleType": "wall"
+    "surface_tolerance": 0.01,
+    "preserve_original": true,
+    "merge_holes": true,
+    "min_area_threshold": 0.1
   },
   "automationRunData": {
     "project_id": "project id",
