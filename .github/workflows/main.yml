@@ -42,8 +42,8 @@ jobs:
       - name: Speckle Automate Function - Build and Publish
         uses: specklesystems/speckle-automate-github-composite-action@0.8.1
         with:
-          speckle_automate_url: "http://localhost:3000"
-          speckle_token: "14f1caea68a8c618acb72a5a76134e87ac4f9cf60e"
+          speckle_automate_url: "https://app.speckle.systems/projects/04b361e916/models/7329a96994"
+          speckle_token: "${{ secrets.SPECKLE_TOKEN }}"  
           speckle_function_id: "14f1caea68"
           speckle_function_input_schema_file_path: ${{ env.FUNCTION_SCHEMA_FILE_NAME }}
           speckle_function_command: 'python -u main.py run'
