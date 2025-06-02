@@ -20,6 +20,7 @@ jobs:
       - name: Install dependencies with pip
         run: |
           pip install specklepy==2.21.4
+          pip install speckle-automate
           pip install pytest==7.4.2
           pip install black==23.3.0
           pip install ruff==0.0.271
@@ -30,20 +31,20 @@ jobs:
         run: |
           python -m pytest tests/ -v
           
-      - name: Run code formatting
+      - name: Run code formatting check
         run: |
           python -m black --check .
           
       - name: Extract functionInputSchema
         id: extract_schema
         run: |
-          python main.py generate_schema ${HOME}/${{ env.FUNCTION_SCHEMA_FILE_NAME }}
+          python main.py generate_schema ${{ env.FUNCTION_SCHEMA_FILE_NAME }}
           
       - name: Speckle Automate Function - Build and Publish
         uses: specklesystems/speckle-automate-github-composite-action@0.8.1
         with:
-          speckle_automate_url: "https://app.speckle.systems/projects/04b361e916/models/7329a96994"
-          speckle_token: "${{ secrets.SPECKLE_TOKEN }}"  
-          speckle_function_id: "14f1caea68"
+          speckle_automate_url: ${{ env.SPECKLE_AUTOMATE_URL || vars.SPECKLE_AUTOMATE_URL || 'https://automate.speckle.dev' }}
+          speckle_token: ${{ secrets.SPECKLE_FUNCTION_TOKEN }}
+          speckle_function_id: ${{ secrets.SPECKLE_FUNCTION_ID }}
           speckle_function_input_schema_file_path: ${{ env.FUNCTION_SCHEMA_FILE_NAME }}
           speckle_function_command: 'python -u main.py run'
