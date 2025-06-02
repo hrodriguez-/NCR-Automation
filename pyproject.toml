@@ -2,7 +2,7 @@
 name = "ncr-automation"
 version = "0.1.0"
 description = "Speckle Automate function to convert Revit Area boundaries to surfaces"
-authors = ["hrodriguez- <your.email@gensler.com>"]
+authors = ["hrodriguez- <hiram_rodriguez@gensler.com>"]
 readme = "README.md"
 package-mode = false
 
