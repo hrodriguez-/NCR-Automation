@@ -32,6 +32,17 @@ jobs:
             echo "❌ SPECKLE_FUNCTION_ID is missing"
           fi
 
+      - name: Debug secret values (REMOVE AFTER TESTING)
+        run: |
+          echo "Token length: ${#SPECKLE_TOKEN}"
+          echo "Function ID length: ${#SPECKLE_FUNCTION_ID}"
+          echo "Token starts with: ${SPECKLE_TOKEN:0:8}..."
+          echo "Function ID starts with: ${SPECKLE_FUNCTION_ID:0:8}..."
+        env:
+              # Use secrets directly in the environment to avoid issues with GitHub Actions
+          SPECKLE_TOKEN: ${{ secrets.SPECKLE_FUNCTION_TOKEN }}
+          SPECKLE_FUNCTION_ID: ${{ secrets.SPECKLE_FUNCTION_ID }}
+
       # Validate required secrets exist with better error handling
       - name: Validate secrets
         run: |
