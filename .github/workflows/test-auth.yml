@@ -1,15 +1,9 @@
-name: 'build and deploy Speckle functions - TESTING'
+name: 'build and deploy Speckle functions'
 on:
   workflow_dispatch:
-    inputs:
-      test_token:
-        description: 'Temporary token for testing (WILL BE VISIBLE IN LOGS!)'
-        required: true
-        type: string
-      test_function_id:
-        description: 'Function ID for testing'
-        required: true
-        type: string
+  push:
+    tags:
+      - '*'
 
 jobs:
   publish-automate-function-version:
@@ -23,11 +17,43 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Use workflow inputs instead of secrets (TEMPORARY ONLY!)
-      - name: ⚠️ USING MANUAL INPUTS FOR TESTING ONLY ⚠️
+      # Debug secrets availability
+      - name: Debug secrets availability
         run: |
-          echo "WARNING: Using manual inputs - token will be visible in logs!"
-          echo "This is for testing only - do not use in production!"
+          echo "Checking secret availability..."
+          if [ -n "${{ secrets.SPECKLE_FUNCTION_TOKEN }}" ]; then
+            echo "✅ SPECKLE_FUNCTION_TOKEN is available"
+          else
+            echo "❌ SPECKLE_FUNCTION_TOKEN is missing"
+          fi
+          if [ -n "${{ secrets.SPECKLE_FUNCTION_ID }}" ]; then
+            echo "✅ SPECKLE_FUNCTION_ID is available"
+          else
+            echo "❌ SPECKLE_FUNCTION_ID is missing"
+          fi
+
+      # Validate required secrets exist
+      - name: Validate secrets
+        run: |
+          MISSING_SECRETS=""
+          
+          if [ -z "${{ secrets.SPECKLE_FUNCTION_TOKEN }}" ]; then
+            echo "❌ ERROR: SPECKLE_FUNCTION_TOKEN secret is required"
+            MISSING_SECRETS="SPECKLE_FUNCTION_TOKEN "
+          fi
+          
+          if [ -z "${{ secrets.SPECKLE_FUNCTION_ID }}" ]; then
+            echo "❌ ERROR: SPECKLE_FUNCTION_ID secret is required"
+            MISSING_SECRETS="${MISSING_SECRETS}SPECKLE_FUNCTION_ID "
+          fi
+          
+          if [ -n "$MISSING_SECRETS" ]; then
+            echo "Missing secrets: $MISSING_SECRETS"
+            echo "Please add these secrets in Settings > Secrets and variables > Actions"
+            exit 1
+          fi
+          
+          echo "✅ All required secrets are present"
           
       - name: Install dependencies
         run: |
@@ -53,21 +79,20 @@ jobs:
         run: |
           python -m black --check .
         continue-on-error: true
-          
-      - name: Extract functionInputSchema
-        id: extract_schema
+        
+      # Test authentication before deploying
+      - name: Test authentication
+        env:
+          SPECKLE_TOKEN: ${{ secrets.SPECKLE_FUNCTION_TOKEN }}
         run: |
-          python main.py generate_schema ${{ env.FUNCTION_SCHEMA_FILE_NAME }}
-          
-      # Test authentication manually first
-      - name: Test Authentication
-        run: |
-          echo "Testing authentication with provided credentials..."
+          echo "Testing authentication with Speckle API..."
           response=$(curl -s -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ github.event.inputs.test_token }}" \
-            https://automate.speckle.dev/api/v1/functions 2>/dev/null | tail -1)
+            -H "Authorization: Bearer $SPECKLE_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"query":"query { user { name } }"}' \
+            https://app.speckle.systems/graphql 2>/dev/null | tail -1)
           
-          echo "HTTP Response Code: $response"
+          echo "Speckle API Response: $response"
           
           case $response in
             200|201) echo "✅ Authentication successful!" ;;
@@ -76,11 +101,23 @@ jobs:
             *) echo "❓ Unexpected response: $response" ;;
           esac
           
+      - name: Extract functionInputSchema
+        id: extract_schema
+        run: |
+          echo "Generating function schema..."
+          python main.py generate_schema ${{ env.FUNCTION_SCHEMA_FILE_NAME }}
+          if [ -f "${{ env.FUNCTION_SCHEMA_FILE_NAME }}" ]; then
+            echo "✅ Schema file generated successfully"
+          else
+            echo "❌ Schema file not found"
+            exit 1
+          fi
+          
       - name: Speckle Automate Function - Build and Publish
         uses: specklesystems/speckle-automate-github-composite-action@0.8.1
         with:
-          speckle_automate_url: 'https://automate.speckle.dev'
-          speckle_token: ${{ github.event.inputs.test_token }}
-          speckle_function_id: ${{ github.event.inputs.test_function_id }}
+          speckle_automate_url: 'https://app.speckle.systems'  # Changed from automate.speckle.dev
+          speckle_token: ${{ secrets.SPECKLE_FUNCTION_TOKEN }}
+          speckle_function_id: ${{ secrets.SPECKLE_FUNCTION_ID }}
           speckle_function_input_schema_file_path: ${{ env.FUNCTION_SCHEMA_FILE_NAME }}
           speckle_function_command: 'python -u main.py run'
