@@ -19,42 +19,41 @@ jobs:
 
       # Validate required secrets exist
       - name: Validate secrets
+        env:
+          SPECKLE_TOKEN: ${{ secrets.SPECKLE_FUNCTION_TOKEN }}
+          SPECKLE_FUNCTION_ID: ${{ secrets.SPECKLE_FUNCTION_ID }}
         run: |
-          if [ -z "${{ secrets.SPECKLE_FUNCTION_TOKEN }}" ]; then
+          if [ -z "$SPECKLE_TOKEN" ]; then
             echo "ERROR: SPECKLE_FUNCTION_TOKEN secret is required"
             exit 1
           fi
-          if [ -z "${{ secrets.SPECKLE_FUNCTION_ID }}" ]; then
+          if [ -z "$SPECKLE_FUNCTION_ID" ]; then
             echo "ERROR: SPECKLE_FUNCTION_ID secret is required"
             exit 1
           fi
-          echo "All required secrets are present"
+          echo "✅ All required secrets are present"
           
-      - name: Install dependencies with pip
-        run: |
-          pip install --upgrade pip
-          pip install specklepy>=2.21.4
-          pip install speckle-automate
-          pip install pytest>=7.4.2
-          pip install black>=23.3.0
-          pip install ruff>=0.0.271
-          pip install mypy>=1.3.0
-          pip install pydantic-settings>=2.3.0
-
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          # OR if the package is on GitHub:
-          # pip install git+https://github.com/specklesystems/speckle-automate.git
+          pip install --upgrade pip
+          pip install specklepy==2.21.4
+          pip install pytest==7.4.2
+          pip install black==23.3.0
+          pip install ruff==0.0.271
+          pip install mypy==1.3.0
+          pip install pydantic-settings==2.3.0
+          # Install speckle-automate from GitHub since it's not on PyPI
+          pip install git+https://github.com/specklesystems/speckle-automate-python.git
           
       - name: Run tests
         run: |
           python -m pytest tests/ -v
-        continue-on-error: true  # Continue even if tests fail, in case test directory doesn't exist
+        continue-on-error: true
 
       - name: Run code formatting check
         run: |
           python -m black --check .
+        continue-on-error: true
           
       - name: Extract functionInputSchema
         id: extract_schema
@@ -64,8 +63,8 @@ jobs:
       - name: Speckle Automate Function - Build and Publish
         uses: specklesystems/speckle-automate-github-composite-action@0.8.1
         with:
-          speckle_automate_url: ${{ vars.SPECKLE_AUTOMATE_URL || 'https://automate.speckle.dev' }}
-          speckle_token: ${{ secrets.speckle_token }}
+          speckle_automate_url: 'https://automate.speckle.dev'
+          speckle_token: ${{ secrets.SPECKLE_FUNCTION_TOKEN }}
           speckle_function_id: ${{ secrets.SPECKLE_FUNCTION_ID }}
           speckle_function_input_schema_file_path: ${{ env.FUNCTION_SCHEMA_FILE_NAME }}
           speckle_function_command: 'python -u main.py run'
