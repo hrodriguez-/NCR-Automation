@@ -1,0 +1,7 @@
+specklepy==2.21.4
+pydantic-settings==2.3.0
+pydantic==2.11.7
+Deprecated>=1.2.13
+attrs>=23.1.0
+httpx>=0.25.0
+ujson>=5.3.0
