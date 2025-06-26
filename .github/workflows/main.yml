@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Debug: Check if secrets are accessible
+      # Debug secrets availability
       - name: Debug secrets availability
         run: |
           echo "Checking secret availability..."
@@ -32,18 +32,7 @@ jobs:
             echo "❌ SPECKLE_FUNCTION_ID is missing"
           fi
 
-      - name: Debug secret values (REMOVE AFTER TESTING)
-        run: |
-          echo "Token length: ${#SPECKLE_TOKEN}"
-          echo "Function ID length: ${#SPECKLE_FUNCTION_ID}"
-          echo "Token starts with: ${SPECKLE_TOKEN:0:8}..."
-          echo "Function ID starts with: ${SPECKLE_FUNCTION_ID:0:8}..."
-        env:
-              # Use secrets directly in the environment to avoid issues with GitHub Actions
-          SPECKLE_TOKEN: ${{ secrets.SPECKLE_FUNCTION_TOKEN }}
-          SPECKLE_FUNCTION_ID: ${{ secrets.SPECKLE_FUNCTION_ID }}
-
-      # Validate required secrets exist with better error handling
+      # Validate required secrets exist
       - name: Validate secrets
         run: |
           MISSING_SECRETS=""
@@ -66,7 +55,7 @@ jobs:
           
           echo "✅ All required secrets are present"
           
-      - name: Install basic dependencies
+      - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install specklepy==2.21.4
@@ -75,37 +64,7 @@ jobs:
           pip install ruff==0.0.271
           pip install mypy==1.3.0
           pip install pydantic-settings==2.3.0
-          
-      - name: Install speckle-automate with fallbacks
-        run: |
-          echo "Attempting to install speckle-automate..."
-          
-          # Method 1: Try PyPI first (in case it's been published)
-          if pip install speckle-automate; then
-            echo "✅ Installed speckle-automate from PyPI"
-          else
-            echo "PyPI installation failed, trying GitHub..."
-            
-            # Method 2: Try GitHub with HTTPS
-            if pip install git+https://github.com/specklesystems/speckle-automate-python.git; then
-              echo "✅ Installed speckle-automate from GitHub"
-            else
-              echo "GitHub installation failed, trying alternative repositories..."
-              
-              # Method 3: Try alternative repository names/locations
-              for repo in "speckle-automate" "speckle-automate-sdk" "speckle-py-automate"; do
-                echo "Trying repository: $repo"
-                if pip install git+https://github.com/specklesystems/$repo.git; then
-                  echo "✅ Installed from specklesystems/$repo"
-                  break
-                fi
-              done
-            fi
-          fi
-          
-          # Verify installation
-          python -c "try: import speckle_automate; print('✅ speckle_automate imported successfully')
-          except ImportError as e: print(f'❌ Import failed: {e}'); exit(1)"
+          pip install git+https://github.com/specklesystems/speckle-automate-python.git
           
       - name: Run tests
         run: |
@@ -120,6 +79,27 @@ jobs:
         run: |
           python -m black --check .
         continue-on-error: true
+        
+      # Test authentication before deploying
+      - name: Test authentication
+        env:
+          SPECKLE_TOKEN: ${{ secrets.SPECKLE_FUNCTION_TOKEN }}
+        run: |
+          echo "Testing authentication with Speckle API..."
+          response=$(curl -s -w "%{http_code}" \
+            -H "Authorization: Bearer $SPECKLE_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"query":"query { user { name } }"}' \
+            https://app.speckle.systems/graphql 2>/dev/null | tail -1)
+          
+          echo "Speckle API Response: $response"
+          
+          case $response in
+            200|201) echo "✅ Authentication successful!" ;;
+            401) echo "❌ Authentication failed - check your token" ;;
+            403) echo "❌ Authentication failed - insufficient permissions" ;;
+            *) echo "❓ Unexpected response: $response" ;;
+          esac
           
       - name: Extract functionInputSchema
         id: extract_schema
@@ -128,8 +108,6 @@ jobs:
           python main.py generate_schema ${{ env.FUNCTION_SCHEMA_FILE_NAME }}
           if [ -f "${{ env.FUNCTION_SCHEMA_FILE_NAME }}" ]; then
             echo "✅ Schema file generated successfully"
-            echo "Schema content:"
-            cat ${{ env.FUNCTION_SCHEMA_FILE_NAME }}
           else
             echo "❌ Schema file not found"
             exit 1
@@ -138,7 +116,7 @@ jobs:
       - name: Speckle Automate Function - Build and Publish
         uses: specklesystems/speckle-automate-github-composite-action@0.8.1
         with:
-          speckle_automate_url: 'https://automate.speckle.dev'
+          speckle_automate_url: 'https://app.speckle.systems'  # Changed from automate.speckle.dev
           speckle_token: ${{ secrets.SPECKLE_FUNCTION_TOKEN }}
           speckle_function_id: ${{ secrets.SPECKLE_FUNCTION_ID }}
           speckle_function_input_schema_file_path: ${{ env.FUNCTION_SCHEMA_FILE_NAME }}
