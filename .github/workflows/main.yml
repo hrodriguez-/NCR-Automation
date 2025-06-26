@@ -64,7 +64,8 @@ jobs:
           pip install ruff==0.0.271
           pip install mypy==1.3.0
           pip install pydantic-settings==2.3.0
-          pip install git+https://github.com/specklesystems/speckle-automate-python.git
+          # Skip speckle-automate - let the composite action handle it
+          echo "✅ Core dependencies installed successfully"
           
       - name: Run tests
         run: |
@@ -116,7 +117,7 @@ jobs:
       - name: Speckle Automate Function - Build and Publish
         uses: specklesystems/speckle-automate-github-composite-action@0.8.1
         with:
-          speckle_automate_url: 'https://app.speckle.systems'  # Changed from automate.speckle.dev
+          speckle_automate_url: 'https://app.speckle.systems'
           speckle_token: ${{ secrets.SPECKLE_FUNCTION_TOKEN }}
           speckle_function_id: ${{ secrets.SPECKLE_FUNCTION_ID }}
           speckle_function_input_schema_file_path: ${{ env.FUNCTION_SCHEMA_FILE_NAME }}
