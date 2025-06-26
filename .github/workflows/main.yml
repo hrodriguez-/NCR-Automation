@@ -64,7 +64,6 @@ jobs:
           pip install ruff==0.0.271
           pip install mypy==1.3.0
           pip install pydantic-settings==2.3.0
-          # Skip speckle-automate - let the composite action handle it
           echo "✅ Core dependencies installed successfully"
           
       - name: Run tests
@@ -80,27 +79,6 @@ jobs:
         run: |
           python -m black --check .
         continue-on-error: true
-        
-      # Test authentication before deploying
-      - name: Test authentication
-        env:
-          SPECKLE_TOKEN: ${{ secrets.SPECKLE_FUNCTION_TOKEN }}
-        run: |
-          echo "Testing authentication with Speckle API..."
-          response=$(curl -s -w "%{http_code}" \
-            -H "Authorization: Bearer $SPECKLE_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"query":"query { user { name } }"}' \
-            https://app.speckle.systems/graphql 2>/dev/null | tail -1)
-          
-          echo "Speckle API Response: $response"
-          
-          case $response in
-            200|201) echo "✅ Authentication successful!" ;;
-            401) echo "❌ Authentication failed - check your token" ;;
-            403) echo "❌ Authentication failed - insufficient permissions" ;;
-            *) echo "❓ Unexpected response: $response" ;;
-          esac
           
       - name: Extract functionInputSchema
         id: extract_schema
@@ -114,10 +92,11 @@ jobs:
             exit 1
           fi
           
+      # Use the exact configuration from the official example
       - name: Speckle Automate Function - Build and Publish
         uses: specklesystems/speckle-automate-github-composite-action@0.8.1
         with:
-          speckle_automate_url: 'https://app.speckle.systems/workspaces/gensler'
+          speckle_automate_url: ${{ vars.SPECKLE_AUTOMATE_URL || 'https://automate.speckle.dev' }}
           speckle_token: ${{ secrets.SPECKLE_FUNCTION_TOKEN }}
           speckle_function_id: ${{ secrets.SPECKLE_FUNCTION_ID }}
           speckle_function_input_schema_file_path: ${{ env.FUNCTION_SCHEMA_FILE_NAME }}
